@@ -675,41 +675,56 @@ handleEventsForBackgroundURLSession:(NSString *)identifier
 - (void)URLSession:(NSURLSession *)session
               task:(NSURLSessionTask *)task
 didCompleteWithError:(NSError *)error {
+
     if (!error) {
         if (![task.response isKindOfClass:[NSHTTPURLResponse class]]) {
-            [NSException raise:@"Invalid NSURLSession state" format:@"Expected response of type  %@", @"NSHTTPURLResponse"];
-        }
-
-        NSHTTPURLResponse *HTTPResponse = (NSHTTPURLResponse *)task.response;
-        NSMutableDictionary *userInfo = [NSMutableDictionary dictionaryWithDictionary:[HTTPResponse allHeaderFields]];
-        if (HTTPResponse.statusCode / 100 == 3
-            && HTTPResponse.statusCode != 304) { // 304 Not Modified is a valid response.
+             //Hyperlync
+//            [NSException raise:@"Invalid NSURLSession state" format:@"Expected response of type  %@", @"NSHTTPURLResponse"];
+            NSLog(@"TransferUtility - Got the bad response");
             error = [NSError errorWithDomain:AWSS3TransferUtilityErrorDomain
-                                        code:AWSS3TransferUtilityErrorRedirection
-                                    userInfo:userInfo];
-        }
+                                        code:AWSS3TransferUtilityErrorCircumventExceptionError
+                                    userInfo:nil];
 
-        if (HTTPResponse.statusCode / 100 == 4) {
-            error = [NSError errorWithDomain:AWSS3TransferUtilityErrorDomain
-                                        code:AWSS3TransferUtilityErrorClientError
-                                    userInfo:userInfo];
         }
-
-        if (HTTPResponse.statusCode / 100 == 5) {
-            error = [NSError errorWithDomain:AWSS3TransferUtilityErrorDomain
-                                        code:AWSS3TransferUtilityErrorServerError
-                                    userInfo:userInfo];
+        else {  //Hyperlync
+            NSHTTPURLResponse *HTTPResponse = (NSHTTPURLResponse *)task.response;
+            NSMutableDictionary *userInfo = [NSMutableDictionary dictionaryWithDictionary:[HTTPResponse allHeaderFields]];
+            if (HTTPResponse.statusCode / 100 == 3
+                && HTTPResponse.statusCode != 304) { // 304 Not Modified is a valid response.
+                error = [NSError errorWithDomain:AWSS3TransferUtilityErrorDomain
+                                            code:AWSS3TransferUtilityErrorRedirection
+                                        userInfo:userInfo];
+            }
+            
+            if (HTTPResponse.statusCode / 100 == 4) {
+                error = [NSError errorWithDomain:AWSS3TransferUtilityErrorDomain
+                                            code:AWSS3TransferUtilityErrorClientError
+                                        userInfo:userInfo];
+            }
+            
+            if (HTTPResponse.statusCode / 100 == 5) {
+                error = [NSError errorWithDomain:AWSS3TransferUtilityErrorDomain
+                                            code:AWSS3TransferUtilityErrorServerError
+                                        userInfo:userInfo];
+            }
         }
     }
 
     if ([task isKindOfClass:[NSURLSessionUploadTask class]]) {
-        AWSS3TransferUtilityUploadTask *uploadTask = [self getUploadTask:(NSURLSessionUploadTask *)task];
-        if (uploadTask.expression.completionHandler) {
+         //Hyperlync
+        if (error && error.code == AWSS3TransferUtilityErrorCircumventExceptionError)
+            NSLog(@"TransferUtility - NSURLSessionUploadTask is OK");
+       AWSS3TransferUtilityUploadTask *uploadTask = [self getUploadTask:(NSURLSessionUploadTask *)task];
+       if (uploadTask.expression.completionHandler) {
             uploadTask.expression.completionHandler(uploadTask,
                                                     error);
         }
     }
+    
     if ([task isKindOfClass:[NSURLSessionDownloadTask class]]) {
+         //Hyperlync
+        if (error && error.code == AWSS3TransferUtilityErrorCircumventExceptionError)
+            NSLog(@"TransferUtility - NSURLSessionDownloadTask is OK");
         AWSS3TransferUtilityDownloadTask *downloadTask = [self getDownloadTask:(NSURLSessionDownloadTask *)task];
         if (error) {
             downloadTask.error = error;
@@ -721,6 +736,7 @@ didCompleteWithError:(NSError *)error {
                                                       downloadTask.error);
         }
     }
+
 
     [self.taskDictionary removeObjectForKey:@(task.taskIdentifier)];
 }
